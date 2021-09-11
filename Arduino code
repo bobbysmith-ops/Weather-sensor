@@ -1,0 +1,270 @@
+
+
+//light sensor
+int sensorPin = A0; // select the input pin for LDR
+int sensorValue = 0; // variable to store the value coming from the sensor
+int brightledpin=13;
+String lightstatus;
+
+//temperature sensor
+int tempsensorpin=A5;
+int tempsensorinput;
+double temp;
+double tempc;
+double tempf;
+String tempstatus;
+int templedpin=8;
+
+//wind sensor
+int windpin=A8;
+int windinput=0;
+String windstatus;
+int windled=46;
+
+
+//timing variables for millis
+int period = 150;
+unsigned long timenow = 0;
+
+//Dipswitch
+int dip;
+double n;
+
+//pushbutton
+int pushpin=4;
+//for debouncing
+bool lastbutton=digitalRead(pushpin);
+bool currentbutton=digitalRead(pushpin);
+
+
+//Serial Monitor
+void printingserial();
+
+
+
+//LCD
+
+
+
+
+void setup() {
+Serial.begin(9600); //sets serial port for communication
+pinMode(brightledpin,OUTPUT);
+pinMode(templedpin,OUTPUT);
+//since im using analog in pins , dont actually have to declare them as input with pinmode
+//but i did for this one anyway
+pinMode(tempsensorpin,INPUT);
+pinMode(windpin,INPUT);
+pinMode(pushpin,INPUT);
+}
+
+void loop() {
+
+//dipswitch code
+dip=digitalRead(6);
+
+if (dip==1)
+n=6;
+else if (dip==0)
+n=60;
+
+  
+
+/////////////////////////////////////PHOTORESISTOR CODE/////////////////////////////////
+
+//COLLECTING THE AVERAGE OVER A MINUTE
+double rawsensorvalue=0;
+double avgrawsensorvalue=0;
+for (int i=0;i<n;i++){
+timenow = millis();  
+rawsensorvalue += analogRead(sensorPin); // read the value from the sensor and add to sum
+while(millis() < timenow + period){
+  //wait
+  }
+}
+avgrawsensorvalue=rawsensorvalue/n;
+  
+//CALIBRATING TO LUX
+sensorValue = map(avgrawsensorvalue, 7, 480, 0, 25000); // apply the lux calibration to the sensor reading
+sensorValue = constrain(sensorValue, 0, 25000); // in case the sensor value is outside the calibration range
+//MADE AN EDIT FROM sesorValue to avgrawsensorvalue, pretty sure it was correct
+
+
+//CLASSIFYING LIGHT CONDITIONS
+if (sensorValue<100)
+lightstatus="Dark";
+if (sensorValue>=100 && sensorValue<=1000)
+lightstatus="Overcast";
+if(sensorValue>=1000 && sensorValue<=10000)
+lightstatus="Bright";
+if(sensorValue>10000)
+lightstatus="Sunny";
+
+//LED CODE
+if (sensorValue>10000)
+digitalWrite(brightledpin,HIGH);
+else
+digitalWrite(brightledpin,LOW);
+
+
+/////////////////////////////////WIND POTENTIOMETER CODE//////////////////////////////
+
+//potentiometer will create an anolog input, which will be read as an integer between 0 and 1023
+/*When the shaft is turned all the way in one direction,
+there are 0 volts going to the pin, and we read 0.
+When the shaft is turned all the way in the other direction,
+there are 5 volts going to the pin and we read 1023*/
+
+double windtest=0;
+double windinput=0;
+double avgwind=0;
+bool still=1;
+bool stormy=0;
+bool windy=0;
+
+double winddiff=0;
+for (int i=0;i<6;i++){
+timenow = millis();  
+windtest = analogRead(windpin);//use windtest variable to test individual wind readings within loop
+windtest = map(windtest, 6, 1023, 0, 100);// better to callibrate/constrain windtest reading in loop here
+windtest = constrain(windtest, 0,100);
+//winddiff=
+
+if ((windtest>60 && windtest<95) || (windtest>5 && windtest<40))
+  if (winddiff<5)
+    windy=1;
+
+
+if (windtest>60 || windtest<40)
+still = 0;
+if (windtest>95 || windtest<5)
+stormy = 1;
+
+
+
+windinput += analogRead(windpin); // use windinput variable to store sums of input from windpin
+while(millis() < timenow + period){
+  //wait
+  }
+}
+avgwind=windinput/6.0;
+
+
+avgwind = map(avgwind, 6, 1023, 0, 100); // callibrate potentiometer to a 0-100 scale
+avgwind = constrain(avgwind, 0,100); // in case the sensor value is outside the calibration range
+
+if (still)
+windstatus="Still";
+if (stormy)
+windstatus="Stormy";
+
+if (stormy)
+digitalWrite(windled,HIGH);
+else if (still)
+digitalWrite(windled,LOW);
+else{
+for(int i=0;i<1;){
+digitalWrite(windled,HIGH);
+timenow=millis();
+while(millis() < timenow + 500){
+  //wait
+  }
+digitalWrite(windled,LOW);
+}
+}
+
+
+/////////////////////////////////THERMORESISTOR CODE////////////////////////////////
+
+double tempsensorinput=0;
+for (int i=0;i<n;i++){
+timenow=millis();
+tempsensorinput+=analogRead(A5); //read the analog sensor and store it
+while(millis() < timenow + period){
+  //wait
+  }
+}
+tempsensorinput=tempsensorinput/n;
+temp=tempsensorinput/1024.0; /*analog voltage input from the thermistor is converted into a
+digital value, an integer between 0 and 1023, 0=0V and 1023=5V, therefore divide the integer returned
+by 1024 to get the percentage of 5V that was returned*/
+temp=temp*5.0; //now multiply by 5V to get the voltage that was returned
+tempc=(temp-0.5)*100; //minus 0.5 and multiply by 100 to get temperature in celsius
+tempf=((tempc*9.0)/5.0)+32.0;
+
+
+//classifying temperature conditions
+if (tempc<=0)
+tempstatus="Below Freezing";
+if (tempc>0 && tempc<=15)
+tempstatus="Cool";
+if (tempc>15 && tempc<=25)
+tempstatus="Warm"; 
+if (tempc>25)
+tempstatus="Hot";
+
+
+//temperature LED code
+if (tempc>15)
+digitalWrite(templedpin,HIGH);
+else
+digitalWrite(templedpin,LOW);
+
+
+/////////////////////////////////SERIAL MONITOR CODE/////////////////////////////////
+
+printingserial();
+
+//////////////////////////////LCD CODE//////////////////////////////////////////
+
+
+
+}
+
+
+//serial monitor function
+
+void printingserial(){
+if (dip==0){
+timenow = millis();
+while(millis()<timenow+600000){
+//wait
+}
+}
+else if (dip==1){
+ timenow = millis();
+ while(millis()<timenow+60000){
+  //wait
+ }
+}
+
+Serial.println("-----------------------------------------------------------");
+Serial.println("Mount Lake Resort Date: 31 Jan 2019 Time: 10:23" );
+Serial.println("Location: Peak Lake");
+Serial.println("-----------------------------------------------------------");
+Serial.print("Wind:                                                    ");
+Serial.println(windstatus);
+Serial.print("Outside Ambient Light:           ");
+Serial.print(sensorValue);
+Serial.print(" Lux              ");
+Serial.println(lightstatus);
+Serial.print("Outside Air Temperature:          "  );
+Serial.print(tempc);
+Serial.print(" C ");
+Serial.print(tempf);
+Serial.print(" F        ");
+Serial.println(tempstatus);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
